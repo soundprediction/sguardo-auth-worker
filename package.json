@@ -1,0 +1,19 @@
+{
+  "name": "sguardo-auth-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OAuth code→token exchange relay for Sguardo. Stateless. No PHI persistence.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "tail:staging": "wrangler tail --env staging",
+    "tail:production": "wrangler tail --env production",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240620.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.65.0"
+  }
+}

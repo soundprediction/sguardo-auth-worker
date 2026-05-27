@@ -1,0 +1,30 @@
+name = "sguardo-auth-worker"
+main = "src/index.ts"
+compatibility_date = "2026-05-15"
+account_id = "REPLACE_ME"  # Cloudflare account ID; run `wrangler whoami`
+
+# Production worker — handles real CMS Blue Button production traffic.
+# Routed via a CNAME on soundprediction.com (set up in Cloudflare DNS).
+[env.production]
+name = "sguardo-auth-worker-production"
+routes = [
+  { pattern = "oauth.soundprediction.com/*", custom_domain = true },
+]
+# Secrets set via `wrangler secret put` (NEVER in this file):
+#   wrangler secret put BB_CLIENT_ID --env production
+#   wrangler secret put BB_CLIENT_SECRET --env production
+[env.production.vars]
+BB_REDIRECT_URI = "https://oauth.soundprediction.com/bluebutton/callback"
+
+# Staging worker — used to test the full OAuth flow against the CMS sandbox.
+[env.staging]
+name = "sguardo-auth-worker-staging"
+routes = [
+  { pattern = "oauth-staging.soundprediction.com/*", custom_domain = true },
+]
+[env.staging.vars]
+BB_REDIRECT_URI = "https://oauth-staging.soundprediction.com/bluebutton/callback"
+
+# Hard limit for free-tier safety; bump only if traffic genuinely needs it.
+[limits]
+cpu_ms = 50

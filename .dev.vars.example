@@ -1,0 +1,6 @@
+# Copy to .dev.vars and fill in your sandbox credentials for local testing.
+# .dev.vars is gitignored. NEVER commit real credentials.
+
+BB_CLIENT_ID=your_sandbox_client_id_here
+BB_CLIENT_SECRET=your_sandbox_client_secret_here
+BB_REDIRECT_URI=http://127.0.0.1:8787/bluebutton/callback

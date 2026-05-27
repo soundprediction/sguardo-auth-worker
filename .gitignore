@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+.dev.vars
+*.log
+.DS_Store
+
+# Secrets must never land here. Cloudflare stores them encrypted via
+# `wrangler secret put`. The .dev.vars file is for local-only secrets and
+# is gitignored by default — keep it that way.
