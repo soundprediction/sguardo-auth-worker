@@ -1,6 +1,17 @@
 # Copy to .dev.vars and fill in your sandbox credentials for local testing.
 # .dev.vars is gitignored. NEVER commit real credentials.
+#
+# Only configure the providers you're actively testing locally — the worker
+# returns 404 for any provider whose four vars aren't all set.
 
-BB_CLIENT_ID=your_sandbox_client_id_here
-BB_CLIENT_SECRET=your_sandbox_client_secret_here
-BB_REDIRECT_URI=http://127.0.0.1:8787/bluebutton/callback
+# CMS Blue Button 2.0 (sandbox)
+BLUEBUTTON_CLIENT_ID=your_sandbox_client_id_here
+BLUEBUTTON_CLIENT_SECRET=your_sandbox_client_secret_here
+BLUEBUTTON_TOKEN_URL=https://sandbox.bluebutton.cms.gov/v2/o/token/
+BLUEBUTTON_REDIRECT_URI=http://127.0.0.1:8787/bluebutton/callback
+
+# Humana (sandbox) — uncomment if testing
+# HUMANA_CLIENT_ID=...
+# HUMANA_CLIENT_SECRET=...
+# HUMANA_TOKEN_URL=https://sandbox.api.humana.com/oauth2/token
+# HUMANA_REDIRECT_URI=http://127.0.0.1:8787/humana/callback

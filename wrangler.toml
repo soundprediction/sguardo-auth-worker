@@ -3,28 +3,121 @@ main = "src/index.ts"
 compatibility_date = "2026-05-15"
 account_id = "REPLACE_ME"  # Cloudflare account ID; run `wrangler whoami`
 
-# Production worker — handles real CMS Blue Button production traffic.
-# Routed via a CNAME on soundprediction.com (set up in Cloudflare DNS).
+# Hard CPU limit for free-tier safety; bump only if traffic genuinely needs it.
+[limits]
+cpu_ms = 50
+
+# -----------------------------------------------------------------------------
+# Production worker — handles real production traffic across all providers.
+# Routed via Custom Domains on oauth.soundprediction.com (set up in CF dashboard).
+# -----------------------------------------------------------------------------
 [env.production]
 name = "sguardo-auth-worker-production"
 routes = [
   { pattern = "oauth.soundprediction.com/*", custom_domain = true },
 ]
-# Secrets set via `wrangler secret put` (NEVER in this file):
-#   wrangler secret put BB_CLIENT_ID --env production
-#   wrangler secret put BB_CLIENT_SECRET --env production
-[env.production.vars]
-BB_REDIRECT_URI = "https://oauth.soundprediction.com/bluebutton/callback"
 
-# Staging worker — used to test the full OAuth flow against the CMS sandbox.
+# Per-provider non-secret config. Token URLs are fixed by each provider's API;
+# redirect URIs must match what's registered with the provider byte-for-byte.
+# Secrets (<PROVIDER>_CLIENT_ID, <PROVIDER>_CLIENT_SECRET) are NOT here — they
+# live in Cloudflare's encrypted store via `wrangler secret put`.
+[env.production.vars]
+# CMS Blue Button 2.0 (Medicare)
+BLUEBUTTON_TOKEN_URL    = "https://api.bluebutton.cms.gov/v2/o/token/"
+BLUEBUTTON_REDIRECT_URI = "https://oauth.soundprediction.com/bluebutton/callback"
+
+# Humana
+HUMANA_TOKEN_URL    = "https://api.humana.com/oauth2/token"
+HUMANA_REDIRECT_URI = "https://oauth.soundprediction.com/humana/callback"
+
+# UnitedHealthcare
+UNITED_TOKEN_URL    = "https://api.uhc.com/oauth2/token"
+UNITED_REDIRECT_URI = "https://oauth.soundprediction.com/united/callback"
+
+# Anthem BCBS
+ANTHEM_TOKEN_URL    = "https://patient-access.api.anthem.com/oauth2/token"
+ANTHEM_REDIRECT_URI = "https://oauth.soundprediction.com/anthem/callback"
+
+# Aetna (CVS Health)
+AETNA_TOKEN_URL    = "https://vteapif1.aetna.com/oauth2/token"
+AETNA_REDIRECT_URI = "https://oauth.soundprediction.com/aetna/callback"
+
+# Cigna
+CIGNA_TOKEN_URL    = "https://api.cigna.com/oauth2/token"
+CIGNA_REDIRECT_URI = "https://oauth.soundprediction.com/cigna/callback"
+
+# Kaiser Permanente
+KAISER_TOKEN_URL    = "https://api.kp.org/oauth2/token"
+KAISER_REDIRECT_URI = "https://oauth.soundprediction.com/kaiser/callback"
+
+# Centene
+CENTENE_TOKEN_URL    = "https://api.centene.com/oauth2/token"
+CENTENE_REDIRECT_URI = "https://oauth.soundprediction.com/centene/callback"
+
+# Molina Healthcare
+MOLINA_TOKEN_URL    = "https://api.molinahealthcare.com/oauth2/token"
+MOLINA_REDIRECT_URI = "https://oauth.soundprediction.com/molina/callback"
+
+# Quest Diagnostics
+QUEST_TOKEN_URL    = "https://api.questdiagnostics.com/oauth/token"
+QUEST_REDIRECT_URI = "https://oauth.soundprediction.com/quest/callback"
+
+# Labcorp
+LABCORP_TOKEN_URL    = "https://api.labcorp.com/oauth/token"
+LABCORP_REDIRECT_URI = "https://oauth.soundprediction.com/labcorp/callback"
+
+# -----------------------------------------------------------------------------
+# Staging worker — sandbox credentials, used to test full OAuth flow before
+# production credentials are issued or while iterating.
+# -----------------------------------------------------------------------------
 [env.staging]
 name = "sguardo-auth-worker-staging"
 routes = [
   { pattern = "oauth-staging.soundprediction.com/*", custom_domain = true },
 ]
-[env.staging.vars]
-BB_REDIRECT_URI = "https://oauth-staging.soundprediction.com/bluebutton/callback"
 
-# Hard limit for free-tier safety; bump only if traffic genuinely needs it.
-[limits]
-cpu_ms = 50
+[env.staging.vars]
+# CMS Blue Button 2.0 sandbox
+BLUEBUTTON_TOKEN_URL    = "https://sandbox.bluebutton.cms.gov/v2/o/token/"
+BLUEBUTTON_REDIRECT_URI = "https://oauth-staging.soundprediction.com/bluebutton/callback"
+
+# Humana sandbox
+HUMANA_TOKEN_URL    = "https://sandbox.api.humana.com/oauth2/token"
+HUMANA_REDIRECT_URI = "https://oauth-staging.soundprediction.com/humana/callback"
+
+# UnitedHealthcare sandbox (no published sandbox endpoint as of writing —
+# use production URL for now; UNITED secret put only with sandbox creds)
+UNITED_TOKEN_URL    = "https://api.uhc.com/oauth2/token"
+UNITED_REDIRECT_URI = "https://oauth-staging.soundprediction.com/united/callback"
+
+# Anthem (no separate sandbox URL published)
+ANTHEM_TOKEN_URL    = "https://patient-access.api.anthem.com/oauth2/token"
+ANTHEM_REDIRECT_URI = "https://oauth-staging.soundprediction.com/anthem/callback"
+
+# Aetna (no separate sandbox URL published)
+AETNA_TOKEN_URL    = "https://vteapif1.aetna.com/oauth2/token"
+AETNA_REDIRECT_URI = "https://oauth-staging.soundprediction.com/aetna/callback"
+
+# Cigna (no separate sandbox URL published)
+CIGNA_TOKEN_URL    = "https://api.cigna.com/oauth2/token"
+CIGNA_REDIRECT_URI = "https://oauth-staging.soundprediction.com/cigna/callback"
+
+# Kaiser (no separate sandbox URL published)
+KAISER_TOKEN_URL    = "https://api.kp.org/oauth2/token"
+KAISER_REDIRECT_URI = "https://oauth-staging.soundprediction.com/kaiser/callback"
+
+# Centene
+CENTENE_TOKEN_URL    = "https://api.centene.com/oauth2/token"
+CENTENE_REDIRECT_URI = "https://oauth-staging.soundprediction.com/centene/callback"
+
+# Molina
+MOLINA_TOKEN_URL    = "https://api.molinahealthcare.com/oauth2/token"
+MOLINA_REDIRECT_URI = "https://oauth-staging.soundprediction.com/molina/callback"
+
+# Quest
+QUEST_TOKEN_URL    = "https://api.questdiagnostics.com/oauth/token"
+QUEST_REDIRECT_URI = "https://oauth-staging.soundprediction.com/quest/callback"
+
+# Labcorp
+LABCORP_TOKEN_URL    = "https://api.labcorp.com/oauth/token"
+LABCORP_REDIRECT_URI = "https://oauth-staging.soundprediction.com/labcorp/callback"

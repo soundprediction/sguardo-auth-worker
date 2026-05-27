@@ -1,6 +1,11 @@
 # sguardo-auth-worker
 
-Cloudflare Worker that handles the **OAuth authorization-code → access-token exchange** for FHIR data providers that require confidential clients (currently CMS Blue Button 2.0; payer endpoints and other providers will be added).
+Cloudflare Worker that handles the **OAuth authorization-code → access-token exchange** for FHIR data providers that require **confidential-client OAuth** (i.e. don't offer a public PKCE flow that a mobile app can use directly).
+
+Supported providers (registered in `src/index.ts`):
+**CMS Blue Button 2.0**, **Humana**, **UnitedHealthcare**, **Anthem BCBS**, **Aetna**, **Cigna**, **Kaiser Permanente**, **Centene**, **Molina Healthcare**, **Quest Diagnostics**, **Labcorp**.
+
+Public-PKCE providers (e.g. **Epic MyChart**) are intentionally NOT routed through this Worker — the app completes their token exchange directly.
 
 > **For forks and downstream open-source contributors**: this code is open source, but the deployed Worker at `oauth.soundprediction.com` is Sound Prediction's production instance — only that team has the matching client_secrets. If you're shipping your own build of Sguardo, see [§10 Adapting for your fork](#10-adapting-for-your-fork). **Never commit `.dev.vars`, real `client_secret` values, or `wrangler secret put` output** — the `.gitignore` blocks `.dev.vars`; double-check before pushing.
 
@@ -136,21 +141,26 @@ Repeat for `oauth-staging.soundprediction.com` under the staging Worker.
 
 Wrangler stores secrets encrypted server-side. They never appear in `wrangler.toml`, source, or logs.
 
-**Staging** (sandbox CMS credentials — instantly available from your sandbox app at bluebutton.cms.gov):
+Secrets follow the naming convention `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET` where `<PROVIDER>` is the uppercased path segment (e.g. `BLUEBUTTON`, `HUMANA`, `UNITED`).
+
+**Staging** (sandbox credentials — set only the providers you actually use):
 
 ```bash
-npx wrangler secret put BB_CLIENT_ID --env staging
-# paste your sandbox client_id, press Enter
+# CMS Blue Button (sandbox creds from https://sandbox.bluebutton.cms.gov/)
+npx wrangler secret put BLUEBUTTON_CLIENT_ID --env staging
+npx wrangler secret put BLUEBUTTON_CLIENT_SECRET --env staging
 
-npx wrangler secret put BB_CLIENT_SECRET --env staging
-# paste your sandbox client_secret, press Enter
+# Humana (when you have a sandbox app at developers.humana.com)
+npx wrangler secret put HUMANA_CLIENT_ID --env staging
+npx wrangler secret put HUMANA_CLIENT_SECRET --env staging
 ```
 
-**Production** (only after CMS approves your production application — typically 2–4 weeks after submission at https://bluebutton.cms.gov/production-access/):
+**Production** (only after each provider approves your production application):
 
 ```bash
-npx wrangler secret put BB_CLIENT_ID --env production
-npx wrangler secret put BB_CLIENT_SECRET --env production
+npx wrangler secret put BLUEBUTTON_CLIENT_ID --env production
+npx wrangler secret put BLUEBUTTON_CLIENT_SECRET --env production
+# ... and so on per provider as their production access is granted
 ```
 
 Verify what's set without revealing values:
@@ -159,6 +169,8 @@ Verify what's set without revealing values:
 npx wrangler secret list --env staging
 npx wrangler secret list --env production
 ```
+
+If a provider's secrets aren't set for a given environment, the Worker returns 404 for that provider's callback path. This is intentional — it means "not configured here" without leaking that the path would otherwise be valid.
 
 ### 4.5 Register the Worker URLs as redirect URIs with CMS
 
@@ -269,82 +281,67 @@ Cloudflare's Workers Analytics dashboard (Workers & Pages → your worker → Me
 
 ## 8. Adding new providers
 
-To extend the Worker for e.g. Humana payer access:
+The Worker is config-driven: adding a new provider that already conforms to RFC 6749 §4.1.3 (authorization-code grant with HTTP Basic Auth on the token endpoint) is just data — no per-provider Worker code.
 
-### 8.1 Add env vars
+### 8.1 Add the provider's path to the registry
 
-In `src/index.ts`:
-
-```typescript
-interface Env {
-  BB_CLIENT_ID: string;
-  BB_CLIENT_SECRET: string;
-  BB_REDIRECT_URI: string;
-
-  // NEW:
-  HUMANA_CLIENT_ID: string;
-  HUMANA_CLIENT_SECRET: string;
-  HUMANA_REDIRECT_URI: string;
-}
-```
-
-### 8.2 Extend the dispatch
+In `src/index.ts`, add to the `PROVIDERS` array:
 
 ```typescript
-function providerFromPath(pathname: string): "bluebutton" | "humana" | null {
-  if (pathname.startsWith("/bluebutton/callback")) return "bluebutton";
-  if (pathname.startsWith("/humana/callback")) return "humana";
-  return null;
-}
-
-function configFor(env: Env, provider: "bluebutton" | "humana"): ProviderConfig {
-  switch (provider) {
-    case "bluebutton":
-      return {
-        clientId: env.BB_CLIENT_ID,
-        clientSecret: env.BB_CLIENT_SECRET,
-        tokenUrl: "https://api.bluebutton.cms.gov/v2/o/token/",
-        redirectUri: env.BB_REDIRECT_URI,
-        appCallbackPath: "/callback/bluebutton",
-      };
-    case "humana":
-      return {
-        clientId: env.HUMANA_CLIENT_ID,
-        clientSecret: env.HUMANA_CLIENT_SECRET,
-        tokenUrl: "https://api.humana.com/oauth2/token",
-        redirectUri: env.HUMANA_REDIRECT_URI,
-        appCallbackPath: "/callback/humana",
-      };
-  }
-}
+const PROVIDERS = [
+  "bluebutton",
+  "humana",
+  // ...
+  "your_new_provider",  // path segment becomes /your_new_provider/callback
+] as const;
 ```
 
-### 8.3 Wrangler env var declarations
+The path segment is the lowercased provider name; the env-var prefix is the same name uppercased.
+
+### 8.2 Add token URL + redirect URI to `wrangler.toml`
+
+For each environment (production + staging):
 
 ```toml
 [env.production.vars]
-BB_REDIRECT_URI = "https://oauth.soundprediction.com/bluebutton/callback"
-HUMANA_REDIRECT_URI = "https://oauth.soundprediction.com/humana/callback"
+YOUR_NEW_PROVIDER_TOKEN_URL    = "https://api.provider.com/oauth2/token"
+YOUR_NEW_PROVIDER_REDIRECT_URI = "https://oauth.soundprediction.com/your_new_provider/callback"
 ```
 
-### 8.4 Set the new secrets
+### 8.3 Set client credentials as encrypted secrets
 
 ```bash
-npx wrangler secret put HUMANA_CLIENT_ID --env production
-npx wrangler secret put HUMANA_CLIENT_SECRET --env production
+npx wrangler secret put YOUR_NEW_PROVIDER_CLIENT_ID --env production
+npx wrangler secret put YOUR_NEW_PROVIDER_CLIENT_SECRET --env production
 ```
 
-### 8.5 Register the redirect URI with Humana's developer portal
+### 8.4 Register the redirect URI with the provider
 
-Same pattern as CMS — the URI must match `HUMANA_REDIRECT_URI` exactly.
+Same pattern as CMS — the URI must match `YOUR_NEW_PROVIDER_REDIRECT_URI` byte-for-byte.
 
-### 8.6 Update the corresponding native-side code
+### 8.5 Wire the app side
 
-On the Flutter app side, ensure `app_links` is registered to handle `sguardo://callback/humana` (Android `AndroidManifest.xml` intent-filter; iOS `Info.plist` CFBundleURLTypes). Existing handler can route based on the path segment.
+On the Flutter app side, ensure `app_links` handles `sguardo://callback/your_new_provider`:
+- Android: add an `<intent-filter>` for the scheme + path in `AndroidManifest.xml`
+- iOS: `CFBundleURLTypes` in `Info.plist` already covers any `sguardo://` path
 
-### 8.7 Public-PKCE providers don't go through here
+The existing `OAuthCallbackHandler` routes by path segment.
 
-Providers like Epic MyChart that support PKCE-only public clients (no `client_secret`) handle the token exchange directly in the app. Don't add them to this Worker — the app's existing OAuth code does it.
+### 8.6 Deploy + verify
+
+```bash
+npm run deploy:production
+curl -i "https://oauth.soundprediction.com/your_new_provider/callback?error=test&state=x"
+# Should return 302 → sguardo://callback/your_new_provider?error=test&state=x
+```
+
+If secrets aren't set, the curl returns 404 (intentional — the provider is in the allowlist but not configured for this environment).
+
+### 8.7 When NOT to use this Worker
+
+Providers that support **public-PKCE OAuth** (no `client_secret`) — e.g. Epic MyChart — should NOT route through here. The native app completes their token exchange directly with PKCE `code_verifier`/`code_challenge`. Don't add them to `PROVIDERS`.
+
+Use this Worker only when the provider's OAuth registration says "confidential client" or requires HTTP Basic Auth with `client_secret` on the token endpoint.
 
 ---
 
@@ -405,7 +402,8 @@ If you're not Sound Prediction and you're shipping your own build of Sguardo (or
 | `wrangler deploy` fails with "Couldn't find an account ID" | `account_id` placeholder in `wrangler.toml` | `npx wrangler whoami`, paste real ID into `wrangler.toml` |
 | Cloudflare dashboard says "Custom Domain is Pending DNS" | CNAME not yet propagated, or wrong target | `dig oauth.soundprediction.com CNAME` should return Cloudflare's target. Wait 5 min, then click "Refresh" in CF dashboard. |
 | OAuth flow on phone redirects to a 404 page | `redirect_uri` registered with CMS doesn't match `BB_REDIRECT_URI` in `wrangler.toml` | Compare both strings character-by-character; even trailing slash matters |
-| Worker returns 500 on real callback but works in `curl` | Probably a `wrangler secret` missing for the active env | `npx wrangler secret list --env production` should show BB_CLIENT_ID and BB_CLIENT_SECRET. If not, `put` them. |
+| Worker returns 500 on real callback but works in `curl` | Probably a `wrangler secret` missing for the active env | `npx wrangler secret list --env production` should show `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET` for every provider you've registered. If a provider's secrets aren't set, the Worker returns 404 for its path rather than 500 — so 500 means a real error mid-handler. |
+| Worker returns 404 for a provider's callback | Either the provider isn't in the `PROVIDERS` array, or its env vars aren't set for this environment | Check `src/index.ts` includes the provider name; check `wrangler secret list --env <env>` shows the 2 secrets; check `wrangler.toml` has the 2 vars |
 | `sguardo://` link doesn't open the app | The phone doesn't have Sguardo installed, OR `app_links` isn't registered for the scheme | Check `ios/Runner/Info.plist` CFBundleURLTypes contains `sguardo`; check Android `intent-filter` for `android:scheme="sguardo"` in `AndroidManifest.xml` |
 | Browser stays on the Worker URL and never redirects | Worker exception (check `wrangler tail`) | Tail logs, find the exception, deploy a fix |
 | Worker returns `token_exchange_failed` | CMS rejected the exchange (expired code, wrong client_secret, wrong redirect_uri) | Codes expire in ~30 seconds. Verify the secret in Wrangler. If still failing, check CMS's developer dashboard for app status. |
