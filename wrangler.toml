@@ -13,9 +13,10 @@ account_id = "661c6159b16257e5cace6af046204a7d"  # Cloudflare account ID; run `w
 # -----------------------------------------------------------------------------
 [env.production]
 name = "sguardo-auth-worker-production"
-routes = [
-  { pattern = "oauth.soundprediction.com/*", custom_domain = true },
-]
+
+[[env.production.routes]]
+pattern = "oauth.soundprediction.com"
+custom_domain = true
 
 # Per-provider non-secret config. Token URLs are fixed by each provider's API;
 # redirect URIs must match what's registered with the provider byte-for-byte.
@@ -72,9 +73,11 @@ LABCORP_REDIRECT_URI = "https://oauth.soundprediction.com/labcorp/callback"
 # -----------------------------------------------------------------------------
 [env.staging]
 name = "sguardo-auth-worker-staging"
-routes = [
-  { pattern = "oauth-staging.soundprediction.com/*", custom_domain = true },
-]
+
+[[env.staging.routes]]
+pattern = "oauth-staging.soundprediction.com"
+custom_domain = true
+
 
 [env.staging.vars]
 # CMS Blue Button 2.0 sandbox
