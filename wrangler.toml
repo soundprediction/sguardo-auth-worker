@@ -1,7 +1,7 @@
 name = "sguardo-auth-worker"
 main = "src/index.ts"
 compatibility_date = "2026-05-15"
-account_id = "REPLACE_ME"  # Cloudflare account ID; run `wrangler whoami`
+account_id = "661c6159b16257e5cace6af046204a7d"  # Cloudflare account ID; run `wrangler whoami`
 
 # Hard CPU limit for free-tier safety; bump only if traffic genuinely needs it.
 [limits]
