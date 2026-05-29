@@ -4,8 +4,8 @@ compatibility_date = "2026-05-15"
 account_id = "661c6159b16257e5cace6af046204a7d"  # Cloudflare account ID; run `wrangler whoami`
 
 # Hard CPU limit for free-tier safety; bump only if traffic genuinely needs it.
-[limits]
-cpu_ms = 50
+#[limits]
+#cpu_ms = 50
 
 # -----------------------------------------------------------------------------
 # Production worker — handles real production traffic across all providers.
